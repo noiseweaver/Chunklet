@@ -1,5 +1,43 @@
 @import "tailwindcss";
 
+/* Focus theme. Light and dark share one set of names; components use only these. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ground: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-raised: #eceef2;
+  --color-line: #dde1e7;
+  --color-ink: #0f141b;
+  --color-muted: #566070;
+  --color-accent: #c4f26a;
+  --color-accent-ink: #0c0f14;
+  --color-accent-strong: #3f6212;
+  --color-accent-soft: #eef9d8;
+  --color-now: #e11d48;
+  --color-warn-soft: #fef3c7;
+  --color-warn-ink: #78350f;
+  --color-danger: #be123c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ground: #0c0f14;
+    --color-surface: #141922;
+    --color-raised: #1e2530;
+    --color-line: #2a3240;
+    --color-ink: #f1f5f9;
+    --color-muted: #94a3b8;
+    --color-accent-strong: #c4f26a;
+    --color-accent-soft: #263016;
+    --color-now: #fb7185;
+    --color-warn-soft: #3a2a0c;
+    --color-warn-ink: #fcd34d;
+    --color-danger: #fda4af;
+  }
+}
+
 :root {
   color-scheme: light dark;
 }
@@ -11,7 +49,13 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  @apply bg-ground font-sans text-ink antialiased;
   -webkit-tap-highlight-color: transparent;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-accent-strong);
+    outline-offset: 2px;
+  }
 }

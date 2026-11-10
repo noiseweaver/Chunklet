@@ -17,13 +17,13 @@ test('capture, preview, commit, then reload offline and the block is still there
   await expect(page.getByRole('list', { name: 'Preview' }).getByRole('listitem')).toHaveCount(2);
   await page.getByRole('button', { name: 'Add 2' }).click();
 
-  await expect(page.getByRole('button', { name: /^review PR, 10:00 to 10:30/ })).toBeVisible();
-  await expect(page.getByRole('region', { name: /Unscheduled/ }).getByText('emails')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^review PR, 10:00, 30 minutes/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: /unscheduled/i }).getByText('emails')).toBeVisible();
 
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole('button', { name: /^review PR, 10:00 to 10:30/ })).toBeVisible();
-  await expect(page.getByRole('region', { name: /Unscheduled/ }).getByText('emails')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^review PR, 10:00, 30 minutes/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: /unscheduled/i }).getByText('emails')).toBeVisible();
 });
 
 test('has an installable manifest', async ({ request, baseURL }) => {

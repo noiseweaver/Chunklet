@@ -3,14 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toIcs } from '../core/calendar';
 import { DEFAULT_SETTINGS, type Block } from '../core/model';
 import { draftToBlock, type Draft } from '../core/parser';
-import { autoPlace, currentBlock, defer, reschedule, unschedule } from '../core/schedule';
+import { autoPlace, defer, reschedule, unschedule } from '../core/schedule';
 import { addDays, toWall } from '../core/time';
 import { db, exportBackup, importBackup, newId, putBlocks, restore, runRollover, softDelete } from '../db';
 import { ActionBar } from './ActionBar';
 import { Capture } from './Capture';
 import { download } from './download';
 import { Timeline } from './Timeline';
-import { Tray } from './Tray';
+import { Agenda, TrayList } from './Agenda';
+import { Hero } from './Hero';
 import { useNow } from './useNow';
 
 const settings = DEFAULT_SETTINGS;
@@ -20,15 +21,6 @@ interface Toast {
   id: number;
   message: string;
   undo?: () => void;
-}
-
-function formatLeft(ms: number): string {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const mm = String(m).padStart(h ? 2 : 1, '0');
-  return `${h ? `${h}:` : ''}${mm}:${String(sec).padStart(2, '0')}`;
 }
 
 function dayLabel(date: string, today: string): string {
@@ -47,6 +39,7 @@ const SHORTCUTS: [string, string][] = [
   ['o', 'Add to Outlook'],
   ['x', 'Delete (with undo)'],
   ['[ / ] / t', 'Previous day / next day / today'],
+  ['v', 'Switch between list and timeline'],
   ['esc', 'Clear selection'],
 ];
 
@@ -58,6 +51,21 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [help, setHelp] = useState(false);
+  const [view, setViewState] = useState<'list' | 'timeline'>(() => {
+    try {
+      return localStorage.getItem('chunklet.view') === 'timeline' ? 'timeline' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+  const setView = (v: 'list' | 'timeline') => {
+    setViewState(v);
+    try {
+      localStorage.setItem('chunklet.view', v);
+    } catch {
+      /* private mode: keep it for this visit only */
+    }
+  };
   const captureRef = useRef<HTMLTextAreaElement>(null);
   const restoreRef = useRef<HTMLInputElement>(null);
 
@@ -84,7 +92,6 @@ export function App() {
     [scheduled, tray, viewDate],
   );
   const selected = blocks.find((b) => b.id === selectedId) ?? null;
-  const running = viewDate === today ? currentBlock(blocks, now) : undefined;
   const canPlace = viewDate >= today;
 
   const notify = useCallback((message: string, undo?: () => void) => setToast({ id: Date.now(), message, undo }), []);
@@ -123,6 +130,7 @@ export function App() {
     void putBlocks(db, placed);
     const left = items.length - placed.length;
     if (left > 0) notify(left === items.length ? 'No free gap left today' : `${left} item${left > 1 ? 's' : ''} did not fit today`);
+    else if (view === 'list' && placed.length) notify(`Placed ${placed.length} block${placed.length > 1 ? 's' : ''}`);
   };
 
   const commit = (drafts: Draft[]) => {
@@ -218,6 +226,9 @@ export function App() {
         case 't':
           setOffset(0);
           break;
+        case 'v':
+          setView(view === 'list' ? 'timeline' : 'list');
+          break;
         case '?':
           setHelp((h) => !h);
           break;
@@ -231,40 +242,52 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const menuItem = 'block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800';
+  const menuItem = 'block w-full rounded-xl px-3 py-2.5 text-left text-sm hover:bg-raised';
+  const iconBtn = 'flex h-11 w-11 items-center justify-center rounded-xl text-muted hover:bg-raised hover:text-ink';
+  const dateCaps = new Date(`${viewDate}T12:00:00Z`)
+    .toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+    .toUpperCase();
+  const segment = (v: 'list' | 'timeline', label: string) => (
+    <button
+      type="button"
+      aria-pressed={view === v}
+      onClick={() => setView(v)}
+      className={`h-9 rounded-full px-3 text-sm font-medium ${view === v ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+    >
+      {label}
+    </button>
+  );
 
   return (
-    <div className="mx-auto flex h-full max-w-5xl flex-col">
-      <header className="flex items-center gap-2 border-b border-slate-200 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 dark:border-slate-800">
-        <div className="flex items-center">
-          <button type="button" aria-label="Previous day" onClick={() => setOffset((o) => o - 1)} className="rounded-lg px-2 py-1 text-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-            ‹
-          </button>
-          <button type="button" onClick={() => setOffset(0)} className="min-w-24 rounded-lg px-1 py-1 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
-            <h1 className="text-base leading-tight font-semibold">{dayLabel(viewDate, today)}</h1>
-            <p className="text-xs leading-tight text-slate-500 dark:text-slate-400">
-              {new Date(`${viewDate}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' })}
-            </p>
-          </button>
-          <button type="button" aria-label="Next day" onClick={() => setOffset((o) => o + 1)} className="rounded-lg px-2 py-1 text-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-            ›
-          </button>
-        </div>
+    <div className="mx-auto flex h-full max-w-2xl flex-col">
+      <header className="flex items-center gap-1 px-2 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1">
+        <button type="button" aria-label="Previous day" onClick={() => setOffset((o) => o - 1)} className={iconBtn}>
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <button type="button" onClick={() => setOffset(0)} className="flex min-h-11 flex-col items-start justify-center rounded-xl px-1.5" aria-label={`${dayLabel(viewDate, today)}, go to today`}>
+          <span className="font-display text-[15px] leading-tight font-semibold tracking-wide whitespace-nowrap">{dateCaps}</span>
+          <span className="text-xs leading-tight text-muted">{dayLabel(viewDate, today)}</span>
+        </button>
+        <button type="button" aria-label="Next day" onClick={() => setOffset((o) => o + 1)} className={iconBtn}>
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
 
-        <div className="min-w-0 flex-1 text-right" aria-live="polite">
-          {running && (
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-sm text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100">
-              <span className="truncate">{running.block.title}</span>
-              <span className="font-semibold tabular-nums">{formatLeft(running.msLeft)}</span>
-            </span>
-          )}
+        <div className="ml-auto flex items-center gap-1 rounded-full bg-raised p-1" role="group" aria-label="View">
+          {segment('list', 'List')}
+          {segment('timeline', 'Timeline')}
         </div>
 
         <details className="relative">
-          <summary aria-label="Menu" className="cursor-pointer list-none rounded-lg px-2 py-1 text-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-            ☰
+          <summary aria-label="Menu" className={`${iconBtn} cursor-pointer list-none`}>
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
           </summary>
-          <div className="absolute right-0 z-40 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+          <div className="absolute right-0 z-40 mt-1 w-64 rounded-2xl border border-line bg-surface p-1.5 shadow-xl">
             <button type="button" className={menuItem} onClick={() => downloadIcs(scheduled.filter((b) => b.date === viewDate), `chunklet-${viewDate}`)}>
               Add whole day to calendar (.ics)
             </button>
@@ -291,51 +314,67 @@ export function App() {
         />
       </header>
 
-      <main data-scroll className="flex-1 overflow-y-auto px-3 py-3">
-        <div className="grid gap-4 md:grid-cols-[1fr_300px]">
-          <div className="md:order-2">
-            <div className="md:sticky md:top-0">
-              <Tray
-                blocks={tray}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onToggle={(b) => void toggle(b)}
-                onPlace={(b) => place([b])}
-                onPlaceAll={() => place(tray.filter((b) => b.status !== 'done'))}
-                canPlace={canPlace}
-              />
-              <p className="mt-3 hidden px-1 text-xs text-slate-500 md:block dark:text-slate-400">
-                Tap a block to complete it, drag to move, drag its bottom edge to resize, swipe sideways to push it to tomorrow. Press <kbd>?</kbd> for shortcuts.
-              </p>
-            </div>
-          </div>
-          <div className="md:order-1">
-            <Timeline
+      <main data-scroll className="flex-1 overflow-y-auto px-4 pb-4">
+        {viewDate === today && (
+          <Hero blocks={blocks} now={now} tz={tz} onDone={(b) => void toggle(b)} onDefer={deferBlock} />
+        )}
+        <div className={`flex flex-col gap-3 ${viewDate === today ? '' : 'pt-3'}`}>
+          {view === 'list' ? (
+            <Agenda
               date={viewDate}
               tz={tz}
-              blocks={scheduled}
               now={now}
-              dayStartMin={settings.dayStartMin}
-              dayEndMin={settings.dayEndMin}
-              snapMin={settings.snapMin}
+              scheduled={scheduled}
+              tray={tray}
               selectedId={selectedId}
+              canPlace={canPlace}
+              isToday={viewDate === today}
               onSelect={setSelectedId}
               onToggle={(b) => void toggle(b)}
               onDefer={deferBlock}
-              onReschedule={(b, start, dur) => void save(reschedule(b, viewDate, start, dur, tz, new Date()))}
+              onPlace={place}
             />
-          </div>
+          ) : (
+            <div className="rounded-2xl bg-surface px-1 pt-4 pb-1">
+              <Timeline
+                date={viewDate}
+                tz={tz}
+                blocks={scheduled}
+                now={now}
+                dayStartMin={settings.dayStartMin}
+                dayEndMin={settings.dayEndMin}
+                snapMin={settings.snapMin}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onToggle={(b) => void toggle(b)}
+                onDefer={deferBlock}
+                onReschedule={(b, start, dur) => void save(reschedule(b, viewDate, start, dur, tz, new Date()))}
+              />
+            </div>
+          )}
+          <TrayList
+            tray={tray}
+            selectedId={selectedId}
+            canPlace={canPlace}
+            onSelect={setSelectedId}
+            onToggle={(b) => void toggle(b)}
+            onDefer={deferBlock}
+            onPlace={place}
+          />
+          <p className="hidden px-2 text-xs text-muted md:block">
+            Tap to complete, swipe sideways to push to tomorrow. In the timeline, drag to move and drag the bottom edge to resize. Press <kbd>?</kbd> for shortcuts.
+          </p>
         </div>
       </main>
 
-      <footer className="sticky bottom-0 z-30">
+      <footer className="z-30">
         {toast && (
-          <div role="status" className="mx-3 mb-2 flex items-center gap-3 rounded-xl bg-slate-900 px-3 py-2 text-sm text-white shadow-lg dark:bg-slate-100 dark:text-slate-900">
+          <div role="status" className="mx-4 mb-2 flex items-center gap-3 rounded-2xl bg-ink px-4 py-2.5 text-sm text-ground shadow-lg">
             <span className="flex-1">{toast.message}</span>
             {toast.undo && (
               <button
                 type="button"
-                className="font-semibold text-indigo-300 dark:text-indigo-700"
+                className="min-h-8 font-semibold text-accent"
                 onClick={() => {
                   toast.undo?.();
                   setToast(null);
@@ -371,21 +410,21 @@ export function App() {
 
       {help && (
         <div role="dialog" aria-modal="true" aria-labelledby="help-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setHelp(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
-            <h2 id="help-title" className="mb-2 font-semibold">
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 id="help-title" className="mb-3 font-display text-lg font-semibold">
               Keyboard shortcuts
             </h2>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
               {SHORTCUTS.map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt>
-                    <kbd className="rounded border border-slate-300 px-1.5 font-mono text-xs dark:border-slate-600">{k}</kbd>
+                    <kbd className="rounded border border-line px-1.5 font-mono text-xs">{k}</kbd>
                   </dt>
                   <dd>{v}</dd>
                 </div>
               ))}
             </dl>
-            <button type="button" className="mt-3 w-full rounded-lg bg-slate-100 py-2 text-sm font-medium dark:bg-slate-800" onClick={() => setHelp(false)}>
+            <button type="button" className="mt-4 h-11 w-full rounded-full bg-raised text-sm font-medium" onClick={() => setHelp(false)}>
               Close
             </button>
           </div>

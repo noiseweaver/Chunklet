@@ -27,13 +27,25 @@ export default defineConfig({
         display: 'standalone',
         start_url: base,
         scope: base,
-        theme_color: '#4f46e5',
-        background_color: '#f8fafc',
+        theme_color: '#0c0f14',
+        background_color: '#0c0f14',
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
+        // Fonts come from Google Fonts; keep a copy so they work offline after the first visit.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],
