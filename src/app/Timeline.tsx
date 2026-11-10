@@ -146,17 +146,17 @@ export function Timeline(p: Props) {
     <div ref={scroller} className="relative select-none" style={{ height: y(endMin) + 16 }} onClick={() => p.onSelect(null)}>
       {hours.map((m) => (
         <div key={m} className="absolute inset-x-0 flex items-start" style={{ top: y(m) }} aria-hidden>
-          <span className="w-12 -translate-y-2 pr-2 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
+          <span className="w-12 -translate-y-2 pr-2 text-right text-xs tabular-nums text-muted">
             {formatHM(m)}
           </span>
-          <span className="flex-1 border-t border-slate-200 dark:border-slate-800" />
+          <span className="flex-1 border-t border-line" />
         </div>
       ))}
 
       {showNow && (
         <div className="pointer-events-none absolute right-0 left-10 z-20 flex items-center" style={{ top: y(nowWall.minutes) }} aria-hidden>
-          <span className="h-2.5 w-2.5 -translate-x-1 rounded-full bg-rose-500" />
-          <span className="h-0.5 flex-1 bg-rose-500" />
+          <span className="h-2.5 w-2.5 -translate-x-1 rounded-full bg-now" />
+          <span className="h-0.5 flex-1 bg-now" />
         </div>
       )}
 
@@ -193,14 +193,14 @@ export function Timeline(p: Props) {
                 onPointerUp={() => up(l)}
                 onPointerCancel={() => setG(null)}
                 className={[
-                  'group relative flex h-full cursor-grab touch-none overflow-hidden rounded-lg border px-2 text-sm transition-[box-shadow,opacity]',
+                  'group relative flex h-full cursor-grab touch-none overflow-hidden rounded-xl border px-2.5 text-sm transition-[box-shadow,opacity]',
                   short ? 'items-center gap-2' : 'flex-col py-1',
                   done
-                    ? 'border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500'
+                    ? 'border-line bg-raised text-muted'
                     : isNow
-                      ? 'border-indigo-500 bg-indigo-100 text-indigo-950 dark:border-indigo-400 dark:bg-indigo-950 dark:text-indigo-50'
-                      : 'border-sky-300 bg-sky-50 text-sky-950 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-50',
-                  selected ? 'ring-2 ring-amber-500 ring-offset-1 ring-offset-slate-50 dark:ring-offset-slate-950' : '',
+                      ? 'border-accent-strong bg-accent-soft text-ink'
+                      : 'border-line bg-surface text-ink',
+                  selected ? 'ring-2 ring-accent-strong ring-offset-1 ring-offset-ground' : '',
                   dragging ? 'cursor-grabbing shadow-lg' : '',
                 ].join(' ')}
                 style={{ transform: v.dx ? `translateX(${v.dx}px)` : undefined, opacity: Math.abs(v.dx) > SWIPE_PX ? 0.5 : undefined }}
@@ -222,7 +222,7 @@ export function Timeline(p: Props) {
                     e.stopPropagation();
                     p.onSelect(selected ? null : l.b.id);
                   }}
-                  className="absolute top-0.5 right-0.5 rounded px-1.5 text-base leading-5 opacity-60 hover:bg-black/5 hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-white/10"
+                  className="absolute top-0.5 right-0.5 rounded px-1.5 text-base leading-5 opacity-60 hover:bg-raised hover:opacity-100 focus-visible:opacity-100"
                 >
                   ⋯
                 </button>

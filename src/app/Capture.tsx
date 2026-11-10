@@ -1,7 +1,7 @@
 import { forwardRef, useMemo, useState } from 'react';
 import type { Block } from '../core/model';
 import { parse, readyToCommit, type Draft } from '../core/parser';
-import { formatHM } from '../core/time';
+import { addDays, formatHM } from '../core/time';
 
 interface Props {
   now: Date;
@@ -14,6 +14,11 @@ interface Props {
 }
 
 type Override = Partial<Pick<Draft, 'title' | 'startMin' | 'durationMin'>> & { clearTime?: boolean };
+
+const dayName = (date: string, base: string) =>
+  date === addDays(base, 1)
+    ? 'tomorrow'
+    : new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 
 const toMin = (hm: string) => {
   const [h, m] = hm.split(':').map(Number);
@@ -72,17 +77,17 @@ export const Capture = forwardRef<HTMLTextAreaElement, Props>(function Capture(p
   };
 
   return (
-    <div className="border-t border-slate-200 bg-white/95 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+    <div className="bg-ground/90 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
       {drafts.length > 0 && (
         <ul aria-label="Preview" aria-live="polite" className="mb-2 max-h-[40vh] space-y-1.5 overflow-y-auto">
           {drafts.map((d) => (
-            <li key={key(d)} className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm dark:border-slate-700 dark:bg-slate-800/60">
+            <li key={key(d)} className="rounded-2xl bg-surface p-2.5 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   aria-label="Title"
                   value={d.title}
                   onChange={(e) => setOverride(d, { title: e.target.value })}
-                  className="min-w-0 flex-1 basis-full rounded border border-transparent bg-transparent px-1 py-0.5 font-medium sm:basis-auto hover:border-slate-300 focus:border-indigo-500 focus:outline-none dark:hover:border-slate-600"
+                  className="min-w-0 flex-1 basis-full rounded border border-transparent bg-transparent px-1 py-0.5 font-medium sm:basis-auto hover:border-line focus:border-accent-strong focus:outline-none"
                 />
                 <input
                   type="time"
@@ -93,9 +98,9 @@ export const Capture = forwardRef<HTMLTextAreaElement, Props>(function Capture(p
                     const m = toMin(e.target.value);
                     setOverride(d, m === undefined ? { clearTime: true, startMin: undefined } : { startMin: m, clearTime: false });
                   }}
-                  className="rounded border border-slate-300 bg-white px-1 py-0.5 tabular-nums dark:border-slate-600 dark:bg-slate-900"
+                  className="rounded-lg border border-line bg-ground px-1.5 py-1 tabular-nums"
                 />
-                <label className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                <label className="flex items-center gap-1 text-muted">
                   <input
                     type="number"
                     min={5}
@@ -103,24 +108,25 @@ export const Capture = forwardRef<HTMLTextAreaElement, Props>(function Capture(p
                     aria-label="Duration in minutes"
                     value={d.durationMin}
                     onChange={(e) => setOverride(d, { durationMin: Math.max(5, Number(e.target.value) || 5) })}
-                    className="w-16 rounded border border-slate-300 bg-white px-1 py-0.5 tabular-nums dark:border-slate-600 dark:bg-slate-900"
+                    className="w-16 rounded-lg border border-line bg-ground px-1.5 py-1 text-ink tabular-nums"
                   />
                   min
                 </label>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {d.date !== p.date ? `${d.date} · ` : ''}
-                  {d.startMin === undefined && !d.ambiguity ? 'to tray' : ''}
+                <span className="text-xs text-muted">
+                  {[d.date !== p.date ? dayName(d.date, p.date) : '', d.startMin === undefined && !d.ambiguity ? 'to tray' : '']
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               </div>
               {d.ambiguity && d.ambiguity.chosen === undefined && (
                 <div role="group" aria-label="Pick a time" className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-amber-700 dark:text-amber-400">Which time?</span>
+                  <span className="text-xs font-medium text-warn-ink">Which time?</span>
                   {d.ambiguity.options.map((o, i) => (
                     <button
                       key={i}
                       type="button"
                       onClick={() => setChoices((c) => ({ ...c, [d.index]: i }))}
-                      className="rounded-full border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                      className="min-h-8 rounded-full border border-accent-strong px-3 text-xs font-semibold hover:bg-accent-soft"
                     >
                       {o.label}
                     </button>
@@ -128,7 +134,7 @@ export const Capture = forwardRef<HTMLTextAreaElement, Props>(function Capture(p
                 </div>
               )}
               {d.warnings.map((w) => (
-                <p key={w} className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <p key={w} className="mt-1 text-xs text-muted">
                   {w}
                 </p>
               ))}
@@ -136,7 +142,7 @@ export const Capture = forwardRef<HTMLTextAreaElement, Props>(function Capture(p
           ))}
         </ul>
       )}
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2 rounded-[28px] border border-line bg-surface py-1.5 pr-1.5 pl-5 focus-within:border-accent-strong">
         <label htmlFor="capture" className="sr-only">
           What do you need to do?
         </label>
@@ -151,18 +157,22 @@ export const Capture = forwardRef<HTMLTextAreaElement, Props>(function Capture(p
             e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
           }}
           onKeyDown={onKeyDown}
-          placeholder="review PR 30m at 10, then emails 20m"
+          placeholder="e.g. review PR 30m at 10"
           enterKeyHint="done"
           autoComplete="off"
-          className="max-h-30 min-h-11 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 focus:outline-none dark:border-slate-700 dark:bg-slate-950"
+          className="max-h-30 min-h-11 flex-1 resize-none self-center bg-transparent py-2.5 text-base text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none"
         />
         <button
           type="button"
           onClick={commit}
           disabled={!ready}
-          className="min-h-11 rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-800"
+          aria-label={`Add${drafts.length > 1 ? ` ${drafts.length}` : ''}`}
+          className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full bg-accent px-3 font-semibold text-accent-ink hover:brightness-95 disabled:bg-raised disabled:text-muted"
         >
-          Add{drafts.length > 1 ? ` ${drafts.length}` : ''}
+          {drafts.length > 1 && <span className="tabular-nums">{drafts.length}</span>}
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
         </button>
       </div>
     </div>
