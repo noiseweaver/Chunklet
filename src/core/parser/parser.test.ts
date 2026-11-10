@@ -101,6 +101,12 @@ describe('ambiguous times are never guessed silently', () => {
     expect(chosen.map((d) => d.startMin)).toEqual([540, 565]);
   });
 
+  it('planning another day uses that day and the daytime reading', () => {
+    const [d] = parse('write report at 7', { now: at(DAY, '20:30'), tz: TZ, date: '2026-11-12' });
+    expect([d?.date, d?.startMin, d?.ambiguity]).toEqual(['2026-11-12', 420, undefined]);
+    expect(parse('emails', { now: at(DAY, '20:30'), tz: TZ, date: '2026-11-12' })[0]?.date).toBe('2026-11-12');
+  });
+
   it('explicit meridiem or 24h time is not ambiguous', () => {
     const evening = { now: at(DAY, '20:30'), tz: TZ };
     expect(parse('call at 7pm', evening)[0]?.ambiguity).toBeUndefined();

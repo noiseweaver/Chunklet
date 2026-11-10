@@ -10,6 +10,8 @@ export interface ParseContext {
   existing?: Block[];
   defaultDurationMin?: number;
   snapMin?: number;
+  /** Day that drafts without a date land on (defaults to today). */
+  date?: string;
   /** Picks for ambiguous drafts: draft index -> option index. */
   choices?: Record<number, number>;
 }
@@ -169,7 +171,8 @@ function extract(raw: string, index: number, ctx: Required<Pick<ParseContext, 'n
     } else {
       const def = daytimeHour(hour) * 60 + minute;
       const alt = otherHalf(daytimeHour(hour)) * 60 + minute;
-      if (date !== undefined || def >= nowWall.minutes) {
+      const planningAhead = ctx.date !== undefined && ctx.date !== nowWall.date;
+      if (date !== undefined || planningAhead || def >= nowWall.minutes) {
         startMin = def;
       } else {
         const todayStr = nowWall.date;
@@ -222,7 +225,7 @@ export function parse(text: string, context: ParseContext): Draft[] {
   const tz = ctx.tz;
   const defaultDuration = ctx.defaultDurationMin ?? DEFAULT_SETTINGS.defaultDurationMin;
   const step = ctx.snapMin ?? DEFAULT_SETTINGS.snapMin;
-  const todayStr = toWall(ctx.now, tz).date;
+  const todayStr = ctx.date ?? toWall(ctx.now, tz).date;
 
   const drafts: Draft[] = [];
   split(text).forEach((seg, index) => {
